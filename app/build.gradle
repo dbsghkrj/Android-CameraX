@@ -54,4 +54,7 @@ dependencies {
 
     implementation "androidx.camera:camera-view:${camerax_version}"
     implementation "androidx.camera:camera-extensions:${camerax_version}"
+
+    //log
+    implementation 'com.jakewharton.timber:timber:4.7.1'
 }
