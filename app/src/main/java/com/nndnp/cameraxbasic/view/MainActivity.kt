@@ -9,12 +9,13 @@ import android.os.Bundle
 import android.provider.MediaStore
 import android.widget.Toast
 import androidx.camera.core.*
+import androidx.camera.core.R
 import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.video.Recorder
-import androidx.camera.video.Recording
+import androidx.camera.video.*
 import androidx.camera.video.VideoCapture
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.PermissionChecker
 import com.nndnp.cameraxbasic.databinding.ActivityMainBinding
 import com.nndnp.cameraxbasic.utils.LuminosityAnalyzer
 import timber.log.Timber
@@ -55,10 +56,72 @@ class MainActivity : AppCompatActivity() {
 
     private fun onEventListener() {
         binding.btnPhoto.setOnClickListener { takePhoto() }
-//        viewBinding.videoCaptureButton.setOnClickListener { captureVideo() }
+        binding.btnVideo.setOnClickListener { captureVideo() }
     }
 
-    private fun captureVideo() {}
+    private fun captureVideo() {
+        val videoCapture = this.videoCapture ?: return
+
+        binding.btnVideo.isEnabled = false
+
+        val curRecording = recording
+        if (curRecording != null) {
+            // Stop the current recording session.
+            curRecording.stop()
+            recording = null
+            return
+        }
+
+        // create and start a new recording session
+        val name = SimpleDateFormat(FILENAME_FORMAT, Locale.getDefault())
+            .format(System.currentTimeMillis())
+        val contentValues = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+            put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
+            if (Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
+                put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/CameraX-Video")
+            }
+        }
+
+        val mediaStoreOutputOptions = MediaStoreOutputOptions
+            .Builder(contentResolver, MediaStore.Video.Media.EXTERNAL_CONTENT_URI)
+            .setContentValues(contentValues)
+            .build()
+        recording = videoCapture.output
+            .prepareRecording(this, mediaStoreOutputOptions)
+            .apply {
+                if (PermissionChecker.checkSelfPermission(this@MainActivity,
+                        Manifest.permission.RECORD_AUDIO) ==
+                    PermissionChecker.PERMISSION_GRANTED)
+                {
+                    withAudioEnabled()
+                }
+            }
+            .start(ContextCompat.getMainExecutor(this)) { recordEvent ->
+                when(recordEvent) {
+                    is VideoRecordEvent.Start -> {
+                        binding.btnVideo.apply {
+                            text = "stop"
+                            isEnabled = true
+                        }
+                    }
+                    is VideoRecordEvent.Finalize -> {
+                        if (!recordEvent.hasError()) {
+                            val msg = "Video capture succeeded: " +
+                                    "${recordEvent.outputResults.outputUri}"
+                            Toast.makeText(baseContext, msg, Toast.LENGTH_SHORT).show()
+                        } else {
+                            recording?.close()
+                            recording = null
+                        }
+                        binding.btnVideo.apply {
+                            text = "take video"
+                            isEnabled = true
+                        }
+                    }
+                }
+            }
+    }
 
     private fun startCamera() {
         /*
@@ -87,6 +150,11 @@ class MainActivity : AppCompatActivity() {
                     })
                 }
 
+            val recorder = Recorder.Builder()
+                .setQualitySelector(QualitySelector.from(Quality.HIGHEST))
+                .build()
+            videoCapture = VideoCapture.withOutput(recorder)
+
             // 후면카메라를 기본으로
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 
@@ -96,7 +164,7 @@ class MainActivity : AppCompatActivity() {
 
                 // Bind use cases to camera
                 cameraProvider.bindToLifecycle(
-                    this, cameraSelector, preview, imageCapture, imageAnalyzer)
+                    this, cameraSelector, preview, videoCapture)
 
             } catch(exc: Exception) {
                 Timber.d("Use case binding failed $exc")

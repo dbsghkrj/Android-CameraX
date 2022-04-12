@@ -18,6 +18,15 @@
         android:text="take photo"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toLeftOf="@id/btnVideo" />
+
+    <Button
+        android:id="@+id/btnVideo"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="take video"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintLeft_toRightOf="@id/btnPhoto"
         app:layout_constraintRight_toRightOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
