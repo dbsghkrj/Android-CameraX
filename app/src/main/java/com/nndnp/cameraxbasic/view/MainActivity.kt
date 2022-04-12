@@ -1,4 +1,4 @@
-package com.nndnp.cameraxbasic
+package com.nndnp.cameraxbasic.view
 
 import android.Manifest
 import android.content.ContentValues
@@ -8,10 +8,7 @@ import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.provider.MediaStore
 import android.widget.Toast
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.ImageCapture
-import androidx.camera.core.ImageCaptureException
-import androidx.camera.core.Preview
+import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.video.Recorder
 import androidx.camera.video.Recording
@@ -19,6 +16,7 @@ import androidx.camera.video.VideoCapture
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.nndnp.cameraxbasic.databinding.ActivityMainBinding
+import com.nndnp.cameraxbasic.utils.LuminosityAnalyzer
 import timber.log.Timber
 import java.text.SimpleDateFormat
 import java.util.*
@@ -26,6 +24,7 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 class MainActivity : AppCompatActivity() {
+
     private lateinit var binding: ActivityMainBinding
 
     private var imageCapture: ImageCapture? = null
@@ -68,19 +67,27 @@ class MainActivity : AppCompatActivity() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
 
         cameraProviderFuture.addListener({
-            // Used to bind the lifecycle of cameras to the lifecycle owner
+            // 카메라 수명주기 관련 바인딩 (기존처럼 카메라를 열고 닫는작업이 필요하지 않음)
             val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
 
-            // Preview
+            // 프리뷰 셋팅
             val preview = Preview.Builder()
                 .build()
                 .also {
                     it.setSurfaceProvider(binding.vFinder.surfaceProvider)
                 }
 
+            // 이미지 캡쳐를 위한 빌드
             imageCapture = ImageCapture.Builder().build()
+            val imageAnalyzer = ImageAnalysis.Builder()
+                .build()
+                .also {
+                    it.setAnalyzer(cameraExecutor, LuminosityAnalyzer { luma ->
+                        Timber.d("Average luminosity: $luma")
+                    })
+                }
 
-            // Select back camera as a default
+            // 후면카메라를 기본으로
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 
             try {
@@ -89,7 +96,7 @@ class MainActivity : AppCompatActivity() {
 
                 // Bind use cases to camera
                 cameraProvider.bindToLifecycle(
-                    this, cameraSelector, preview, imageCapture)
+                    this, cameraSelector, preview, imageCapture, imageAnalyzer)
 
             } catch(exc: Exception) {
                 Timber.d("Use case binding failed $exc")
